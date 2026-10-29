@@ -1,0 +1,128 @@
+================================================================================
+RELATÓRIO TÉCNICO DE ANÁLISE, DEPURAÇÃO E EVOLUÇÃO DO CÓDIGO (calculadora.py)
+Data: 28/10/2026
+Arquivo Alvo: D:\Cristiano\Desktop\calculadora.py
+================================================================================
+
+1. ANÁLISE DO CÓDIGO INICIAL
+--------------------------------------------------------------------------------
+O código inicial continha uma aplicação gráfica de calculadora com interface escura
+em Tkinter (107 linhas).
+
+Estrutura original:
+- Interface em matriz 5 linhas x 4 colunas com tamanho fixo 320x420.
+- Funções básicas: clicar_botao(), limpar(), calcular().
+- Operações suportadas: Adição (+), Subtração (-), Multiplicação (*), Divisão (/),
+  Parênteses () e Limpeza (C).
+- Cálculo realizado via eval(expressao) direto sem tratamento avançado.
+
+Limitações identificadas:
+1. Ausência de operações avançadas exigidas: Potenciação, Radiciação e Porcentagem.
+2. Incompatibilidade da sintaxe visual com o Python:
+   - Em Python, o símbolo '^' é OU-exclusivo binário (bitwise XOR), não potência (**).
+   - O caractere de raiz quadrada '√' não é um operador sintático nativo.
+   - O símbolo '%' em Python calcula o resto da divisão inteira (módulo), e não porcentagem
+     comercial/aritmética (ex: 100 + 10% deveria ser 110, não um erro de sintaxe).
+3. eval() executado de forma aberta no escopo global (suscetível a comandos inesperados).
+4. Ausência da cláusula `if __name__ == "__main__":`, o que bloqueava importações para testes.
+
+
+2. ESPECIFICAÇÃO DOS REQUISITOS E DESAFIOS
+--------------------------------------------------------------------------------
+Requisito: Implementar o cálculo de porcentagem (%), potenciação (^) e radiciação (√)
+sem comprometer as funções previamente existentes.
+
+Desafio de Layout:
+- Acomodar 3 novos botões mantendo o padrão numérico clássico (7-8-9, 4-5-6, 1-2-3, 0-.)
+  e a coluna lateral padrão de operadores.
+
+Desafio Matemático:
+- Traduzir a expressão visual inserida pelo usuário em expressões matemáticas 
+  estritamente válidas e seguras para a execução em Python.
+
+
+3. PROCESSO DE DEPURAÇÃO E IMPLEMENTAÇÃO (PASSO A PASSO)
+--------------------------------------------------------------------------------
+
+3.1. Reestruturação da Grade Visual (GUI):
+- Redimensionamento da janela de 320x420 para 320x480 (altura proporcional para mais uma linha).
+- Definição de uma matriz 6 linhas x 4 colunas:
+  * Linha 1: [ C ]   [ ( ]   [ ) ]   [ / ]
+  * Linha 2: [ √ ]   [ ^ ]   [ % ]   [ * ]  <-- Linha com as novas operações
+  * Linha 3: [ 7 ]   [ 8 ]   [ 9 ]   [ - ]
+  * Linha 4: [ 4 ]   [ 5 ]   [ 6 ]   [ + ]
+  * Linha 5: [ 1 ]   [ 2 ]   [ 3 ]   [ = ]  <-- '=' expandido verticalmente (rowspan=2)
+  * Linha 6: [   0   ]       [ . ]   [ = ]  <-- '0' expandido horizontalmente (colspan=2)
+- Essa distribuição manteve a coluna direita com os operadores universais (/, *, -, +, =).
+
+3.2. Implementação do Motor de Tradução de Expressões (preparar_expressao):
+- Criada a função modular `preparar_expressao(exp)` com suporte a Expressões Regulares (re):
+  
+  a) Potenciação (^):
+     Substitui '^' por '**' nativo do Python (ex: 2^3 vira 2**3).
+  
+  b) Radiciação (√):
+     - Criada a função `clicar_raiz()`:
+       * Se o visor estiver vazio ou após operador: insere "√(".
+       * Se o visor já contiver um número ou resultado: encapsula no formato "√(valor)".
+     - Conversão no motor:
+       * Suporta formato com parênteses: "√(16)" -> "math.sqrt(16)".
+       * Suporta formato sem parênteses: "√25" -> "math.sqrt(25)".
+       * Suporta multiplicação implícita antes do radical: "2√9" -> "2 * math.sqrt(9)".
+  
+  c) Porcentagem (%):
+     - Caso A (Acréscimo e Desconto):
+       Identifica padrões como `100 + 10%` ou `200 - 20%`.
+       Regex converte para: `A +/- (A * (B / 100))`.
+       Resultado: 100 + 10% resulta em 110 (comportamento padrão de calculadoras).
+     - Caso B (Percentual Direto e Multiplicações):
+       Converte ocorrências restantes de `%` para `(/ 100)`.
+       Exemplos: 200 * 15% -> 200 * (15 / 100) = 30.
+                 50% -> (50 / 100) = 0.5.
+
+  d) Auto-fechamento de Parênteses:
+     Compara o total de '(' e ')' abertos e insere os fechamentos faltantes automaticamente
+     antes de enviar para avaliação, evitando erros de digitação comum.
+
+3.3. Reforço de Segurança e Tratamento de Exceções:
+- O cálculo foi isolado: `eval(exp_preparada, {"__builtins__": None, "math": math})`.
+- Tratamento de `ZeroDivisionError`: alerta amigável de divisão por zero.
+- Tratamento de `ValueError`: intercepta tentativas de raiz de número negativo 
+  (ex: √(-9)) alertando que não é permitido no domínio real.
+- Formatação de saída: adicionado arredondamento com `round(resultado, 10)` e conversão
+  para inteiro quando não houver casas decimais (ex: 4.0 é exibido como 4 limpo).
+
+3.4. Boas Práticas e Integração:
+- Vinculado evento `<Return>` no visor para permitir calcular teclando Enter no teclado.
+- Encapsulado o `janela.mainloop()` dentro de `if __name__ == "__main__":`.
+
+
+4. BATERIA DE TESTES E CASOS VALIDADOS
+--------------------------------------------------------------------------------
+Os seguintes casos de teste foram executados e aprovados:
+
+Operação Testada        Entrada                Expressão Convertida                  Resultado
+---------------------------------------------------------------------------------------------
+Potência básica         2^3                    2**3                                  8
+Potência encadeada      2^3^2                  2**3**2                               512
+Radiciação com parênt.  √(16)                  math.sqrt(16)                         4
+Radiciação direta       √25                    math.sqrt(25)                         5
+Expressão com raiz      10 + √(4)              10 + math.sqrt(4)                     12
+Multiplicação c/ raiz   2√9                    2 * math.sqrt(9)                      6
+Porcentagem (soma)      100 + 10%              100 + (100 * (10 / 100))              110
+Porcentagem (subtração) 200 - 20%              200 - (200 * (20 / 100))              160
+Porcentagem direta      50%                    (50 / 100)                            0.5
+Porcentagem multiplic.  200 * 15%              200 * (15 / 100)                      30
+Operações combinadas    2^3 + √(9) * 2 - 50%   2**3 + math.sqrt(9)*2 - (2*(50/100))  13
+Divisão por zero        10 / 0                 Mensagem de erro exibida              OK (interceptado)
+Raiz de negativo        √(-4)                  Mensagem de erro exibida              OK (interceptado)
+Sintaxe inválida        5 + * 2                Mensagem de erro exibida              OK (interceptado)
+
+
+5. RESULTADO FINAL
+--------------------------------------------------------------------------------
+O arquivo `calculadora.py` foi atualizado com sucesso.
+Compilação de sintaxe verificada via `py_compile` com 0 erros.
+A interface foi executada em ambiente Windows e está pronta para uso imediato
+ou para empacotamento em formato `.exe` (via PyInstaller).
+================================================================================
